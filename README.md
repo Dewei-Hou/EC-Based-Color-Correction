@@ -28,8 +28,9 @@ Four input directories are required for program execution:
 + "correspondence" : The matching feature points of the aligned images in "aligned_result". The CSV file "XX__YY_inliers.csv" contains the x-y coordinates of the matching feature points on images XX and YY.
 + "img_masks" : The masks of the images after alignment. The image file "mask_XX.png" represents the mask for the aligned image "XX__warped_img.png".
 
-An output directory is required for saving the color corrected results:
+Two output directories are required for saving the color corrected results:
 + "Ours": The color corrected images of "aligned_result" are saved in this directory.
++ "result": The color corrected aligned multiple images of "Ours" is saved in this directory.
 
 All 30 testing multiple images and the qualitative quality results are available at https://drive.google.com/drive/u/3/folders/1avBu1zL5PUl8SsLXG1Ot4XWGgcLRKw4t
 
