@@ -2,7 +2,8 @@
 "Color Correction for Multiple Images via Error Compensation-Based Fusion Approach" by Kuo-Liang Chung and Te-Wei Hou.
 
 ## Introduction
-![alt text](flowchart.png)
+![flowchart](https://github.com/user-attachments/assets/24eb70bb-28d9-49fd-8006-f3d13647a7e3)
+
 
 Color correction for multiple images.
 
