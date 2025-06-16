@@ -7,7 +7,7 @@
 
 Color correction for multiple images.
 
-An example of our algorithm effects is demonstrated below:
+An example of our algorithm's effect is demonstrated below:
 ![alt text](sample.png)
 
 
@@ -16,9 +16,10 @@ An example of our algorithm effects is demonstrated below:
 + OpenCV 4.7.0
 + OpenMP (optional)
 
-## Environments
-+ Intel Core i5-12400 CPU clocked at 2.5 GHz, 16 GB RAM
-+ Microsoft Windows 11 64-bit operating system
+## Environment
++ Intel Core i7-12700F CPU clocked at 4.8 GHz, 32 GB RAM
++ NVIDIA GeForce RTX 3080 GPU (optional)
++ Microsoft Windows 10 64-bit operating system
 + Microsoft Visual Studio 2022
 
 ## Configuration & Run Tests
