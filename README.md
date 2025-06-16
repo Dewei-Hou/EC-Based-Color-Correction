@@ -1,5 +1,5 @@
-# Color Correction for Multiple Images via Error Compensation-Based Fusion Approach
-"Color Correction for Multiple Images via Error Compensation-Based Fusion Approach" by Kuo-Liang Chung and Te-Wei Hou.
+# Error Compensation-Based Fusion Algorithm for Drone-image Color Correction
+"Error Compensation-Based Fusion Algorithm for Drone-image Color Correction" by Kuo-Liang Chung and Te-Wei Hou.
 
 ## Introduction
 ![flowchart](https://github.com/user-attachments/assets/24eb70bb-28d9-49fd-8006-f3d13647a7e3)
