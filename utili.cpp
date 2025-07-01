@@ -1,4 +1,4 @@
-﻿#include <opencv2/core.hpp>
+#include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
@@ -483,7 +483,7 @@ Mat Utils::JBI(Mat& ref, Mat& tar, Mat& overlap, vector<pair<Point2f, Point2f>>&
 
                         // JBI
                         double spatialDistance = cv::norm(curr_pt - src_pt);
-                        double weight = calculateJBIWeight(color_curr, color_src, spatialDistance, 0.5, 5.0, tar.cols);
+                        double weight = calculateJBIWeight(color_curr, color_src, spatialDistance, 0.3, 0.7, tar.cols);
 
                         weightVec[k] = weight;
 
@@ -513,17 +513,14 @@ Mat Utils::JBI(Mat& ref, Mat& tar, Mat& overlap, vector<pair<Point2f, Point2f>>&
 
 Mat Utils::NonOverlapJBI(Mat& ori_img, Mat& correct_img, vector<Point>& border_pixel, Mat& overlap, Mat& mask) {
     vector<Vec3d> color_diff(border_pixel.size());
-
     Mat result = Mat::zeros(ori_img.size(), CV_64FC3);
-
     Mat ref_64FC3, tar_64FC3;
     correct_img.convertTo(ref_64FC3, CV_64FC3);
     ori_img.convertTo(tar_64FC3, CV_64FC3);
 
-    // D(C_i) = C_s(C_i) - C_t(C_i), i=1,2, ...,|C|
-    for (size_t i = 0; i < border_pixel.size(); ++i) {
+#pragma omp parallel for
+    for (int i = 0; i < border_pixel.size(); ++i) {
         Point2f pt = border_pixel[i];
-
         if (pt.x >= 0 && pt.y >= 0 && pt.x < ori_img.cols && pt.y < ori_img.rows) {
             Vec3d color1 = ref_64FC3.at<Vec3d>(pt);
             Vec3d color2 = tar_64FC3.at<Vec3d>(pt);
@@ -531,48 +528,66 @@ Mat Utils::NonOverlapJBI(Mat& ori_img, Mat& correct_img, vector<Point>& border_p
         }
     }
 
+    vector<Point> valid_pixels;
 
-#pragma omp parallel for collapse(2)
-    for (int i = 0; i < ori_img.rows; ++i) {
-        for (int j = 0; j < ori_img.cols; ++j) {
-            if (!overlap.at<uchar>(i, j) && mask.at<uchar>(i, j)) {
-                Point2f curr_pt(j, i);
-                double sumWeights = 0.0;
-                Vec3d weightedColorDiff(0, 0, 0);
-                vector<double> weightVec(border_pixel.size());
+#pragma omp parallel
+    {
+        vector<Point> local_pixels;
 
-                for (int k = 0; k < border_pixel.size(); ++k) {
-                    Point2f src_pt = border_pixel[k];
-                    if (curr_pt.x >= 0 && curr_pt.y >= 0 && curr_pt.x < ori_img.cols && curr_pt.y < ori_img.rows &&
-                        src_pt.x >= 0 && src_pt.y >= 0 && src_pt.x < ori_img.cols && src_pt.y < ori_img.rows) {
-                        Vec3d color_curr = tar_64FC3.at<Vec3d>(curr_pt);
-                        Vec3d color_src = ref_64FC3.at<Vec3d>(src_pt);
-
-                        // JBI
-                        double spatialDistance = cv::norm(curr_pt - src_pt);
-                        double weight = calculateJBIWeight(color_curr, color_src, spatialDistance, 0.5, 5.0, ori_img.cols); // sigma1=[0.05,0.5] sigma2=[0.5,5]
-
-                        weightVec[k] = weight;
-                        sumWeights += weight;
-                    }
+#pragma omp for collapse(2) nowait
+        for (int i = 0; i < ori_img.rows; ++i) {
+            for (int j = 0; j < ori_img.cols; ++j) {
+                if (!overlap.at<uchar>(i, j) && mask.at<uchar>(i, j)) {
+                    local_pixels.push_back(Point(j, i));
                 }
-
-                //weight
-                if (sumWeights > 0) {
-                    double logSumWeight = std::log(sumWeights);
-                    for (int idx = 0; idx < border_pixel.size(); idx++) {
-                        for (int c = 0; c < 3; c++) {
-                            double logWeight = std::log(weightVec[idx]);
-                            double expWeight = exp(logWeight - logSumWeight);
-                            if (color_diff[idx][c] != 0.0) {
-                                weightedColorDiff[c] += expWeight * color_diff[idx][c];
-                            }
-                        }
-                    }
-                }
-                result.at<Vec3d>(i, j) = weightedColorDiff;
             }
         }
+
+#pragma omp critical
+        {
+            valid_pixels.insert(valid_pixels.end(), local_pixels.begin(), local_pixels.end());
+        }
+    }
+
+#pragma omp parallel for schedule(dynamic, 50)
+    for (int idx = 0; idx < valid_pixels.size(); ++idx) {
+        Point pixel = valid_pixels[idx];
+        int i = pixel.y;
+        int j = pixel.x;
+
+        Point2f curr_pt(j, i);
+        double sumWeights = 0.0;
+        Vec3d weightedColorDiff(0, 0, 0);
+        vector<double> weightVec(border_pixel.size());
+
+        for (int k = 0; k < border_pixel.size(); ++k) {
+            Point2f src_pt = border_pixel[k];
+            if (curr_pt.x >= 0 && curr_pt.y >= 0 && curr_pt.x < ori_img.cols && curr_pt.y < ori_img.rows &&
+                src_pt.x >= 0 && src_pt.y >= 0 && src_pt.x < ori_img.cols && src_pt.y < ori_img.rows) {
+                Vec3d color_curr = tar_64FC3.at<Vec3d>(curr_pt);
+                Vec3d color_src = ref_64FC3.at<Vec3d>(src_pt);
+                // JBI
+                double spatialDistance = cv::norm(curr_pt - src_pt);
+                double weight = calculateJBIWeight(color_curr, color_src, spatialDistance, 0.3, 0.7, ori_img.cols);
+                weightVec[k] = weight;
+                sumWeights += weight;
+            }
+        }
+
+        // weight
+        if (sumWeights > 0) {
+            double logSumWeight = std::log(sumWeights);
+            for (int k = 0; k < border_pixel.size(); k++) {
+                for (int c = 0; c < 3; c++) {
+                    double logWeight = std::log(weightVec[k]);
+                    double expWeight = exp(logWeight - logSumWeight);
+                    if (color_diff[k][c] != 0.0) {
+                        weightedColorDiff[c] += expWeight * color_diff[k][c];
+                    }
+                }
+            }
+        }
+        result.at<Vec3d>(i, j) = weightedColorDiff;
     }
 
     return result;
@@ -881,9 +896,9 @@ Mat Utils::getFusionNonOverlap(Mat& warped_tar_img, Mat& cite_range, Mat& Fecker
             if (!overlap.at<uchar>(p) && mask.at<uchar>(p)) {
                 for (int c = 0; c < 3; c++) {
                     double rate = 1.0 * cite_range.at<int>(p) / border_pixel.size();
-                    rate = rate > 1.0 ? 1.0 : rate < 0.0 ? 0.0 : rate;
-                    //rate = 0.0;
-                    result.at<Vec3d>(p)[c] = Fecker_comp.at<Vec3d>(p)[c] * rate + JBI_comp.at<Vec3d>(p)[c] * (1.0 - rate);
+                    double weighted_rate = rate * 0.2;
+                    weighted_rate = weighted_rate > 1.0 ? 1.0 : weighted_rate < 0.0 ? 0.0 : weighted_rate;
+                    result.at<Vec3d>(p)[c] = Fecker_comp.at<Vec3d>(p)[c] * (1.0 - weighted_rate) + JBI_comp.at<Vec3d>(p)[c] * weighted_rate;
                 }
             }
         }
